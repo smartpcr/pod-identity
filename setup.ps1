@@ -16,6 +16,8 @@ $acrLoginServer = $acr.loginServer
 $serviceImageName = "test/$($serviceName)"
 $serviceImageTag = "latest"
 $fullImageName = "$($acrLoginServer)/$($serviceImageName)"
+$aksSpnName = "rrdu-azds-dev-xd-k8s-spn"
+$aksSpn = az ad sp list --display-name $aksSpnName | ConvertFrom-Json
 
 Write-Host "1. Creating managed service identity '$serviceName'..." -ForegroundColor White 
 $msisFound = az identity list --resource-group $mcResourceGroupName --query "[?name=='$serviceName']" | ConvertFrom-Json
@@ -44,20 +46,26 @@ $settings = @{
         resourceGroup = $mcResourceGroupName
         id            = $serviceIdentity.id 
     }
+    aksSpn = @{
+        appId = $aksSpn.appId
+    }
 }
 
-Write-Host "Grating read access to aks resource group '$($mcResourceGroupName)'..." -ForegroundColor Yellow
+Write-Host "Granting read access to aks resource group '$($mcResourceGroupName)'..." -ForegroundColor Yellow
 $mcRG = az group show --name $mcResourceGroupName | ConvertFrom-Json
 az role assignment create --role Reader --assignee $serviceIdentity.principalId --scope $mcRG.id | Out-Null 
 
-# Write-Host "Grating read access to aks resource group '$($defaultResourceGroupName)'..." -ForegroundColor Yellow
-# $rg = az group show --name $defaultResourceGroupName | ConvertFrom-Json
-# az role assignment create --role Reader --assignee $serviceIdentity.principalId --scope $rg.id | Out-Null 
+Write-Host "Grating read access to aks resource group '$($defaultResourceGroupName)'..." -ForegroundColor Yellow
+$rg = az group show --name $defaultResourceGroupName | ConvertFrom-Json
+az role assignment create --role Reader --assignee $serviceIdentity.principalId --scope $rg.id | Out-Null 
 
 Write-Host "Granting read access to key vault '$vaultName'..." -ForegroundColor Yellow
 $kv = az keyvault show --resource-group $defaultResourceGroupName --name $vaultName | ConvertFrom-Json
 az role assignment create --role Reader --assignee $serviceIdentity.principalId --scope $kv.id | Out-Null
+az keyvault set-policy -n $vaultName --secret-permissions get list --spn $serviceIdentity.clientId | Out-Null
 
+Write-Host "Granting aks spn access to managed identity..."
+az role assignment create --role "Managed Identity Operator" --assignee $aksSpn.appId --scope $serviceIdentity.id | Out-Null
 
 Write-Host "2. Setup ACR connection as secret in AKS..."
 kubectl create secret docker-registry acr-auth `
