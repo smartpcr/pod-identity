@@ -118,3 +118,11 @@ $identityBindingYamlFile = Join-Path $gitRootFolder "AadPodIdentityBinding.yaml"
 $identityBindingContent | Out-File $identityBindingYamlFile -Force 
 kubectl apply -f $identityBindingYamlFile 
 
+Write-Host "7. Deploy service and expose api endpoint..."
+$serviceTemplateFile = Join-Path $templatesFolder "Service.tpl"
+$serviceContent = Get-Content $serviceTemplateFile -Raw 
+$serviceContent = $serviceContent.Replace("{{.Values.service.name}}", $settings.service.name)
+$serviceContent = $serviceContent.Replace("{{.Values.service.label}}", $settings.service.label)
+$serviceYamlFile = Join-Path $gitRootFolder "Service.yaml"
+$serviceContent | Out-File $serviceYamlFile -Force 
+kubectl apply -f $serviceYamlFile 
