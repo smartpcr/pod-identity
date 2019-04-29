@@ -1,4 +1,4 @@
-apiVersion: extensions/v1beta
+apiVersion: extensions/v1beta1
 kind: Deployment 
 metadata:
   labels:
@@ -15,12 +15,12 @@ spec:
     spec:
       containers:
       - name: {{.Values.service.name}}
-        image: "{{.Values.acr.name}}/{{.Values.service.image.name}}:{{.Values.service.image.tag}}"
+        image: "{{.Values.service.image.name}}:{{.Values.service.image.tag}}"
         imagePullPolicy: Always 
         args:
-          - "--subscriptionid={{.Values.global.subscriptionId}}"
+          - "--subscriptionid={{.Values.subscriptionId}}"
           - "--clientid={{.Values.serviceIdentity.clientId}}"
-          - "--resourcegroup={{.Values.service.resourceGroup}}"
+          - "--resourcegroup={{.Values.serviceIdentity.resourceGroup}}"
           - "--aad-resourcename=https://vault.azure.net"
         env:
         - name: MY_POD_NAME
