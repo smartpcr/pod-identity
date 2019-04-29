@@ -1,3 +1,4 @@
+
 # assumes you are already logged in to azure 
 $defaultResourceGroupName = "azds-dev-rg"
 $aksClusterName = "rrdu-azds-k8s-dev"
@@ -17,17 +18,15 @@ $serviceImageTag = "latest"
 $fullImageName = "$($acrLoginServer)/$($serviceImageName)"
 
 Write-Host "1. Creating managed service identity '$serviceName'..." -ForegroundColor White 
-$msisFound = az identity list --resource-group $defaultResourceGroupName --query "[?name=='$serviceName']" | ConvertFrom-Json
+$msisFound = az identity list --resource-group $mcResourceGroupName --query "[?name=='$serviceName']" | ConvertFrom-Json
 if (!$msisFound -or ([array]$msisFound).Length -eq 0) {
     Write-Host "Creating service identity '$serviceName'..."
-    az identity create --name $serviceName --resource-group $defaultResourceGroupName | Out-Null
+    az identity create --name $serviceName --resource-group $mcResourceGroupName | Out-Null
 }
 else {
     Write-Host "Service identity '$serviceName' is already created."
 }
-$serviceIdentity = az identity show --resource-group $defaultResourceGroupName --name $serviceName | ConvertFrom-Json
-
-
+$serviceIdentity = az identity show --resource-group $mcResourceGroupName --name $serviceName | ConvertFrom-Json
 
 $settings = @{
     subscriptionId  = $azAccount.id
@@ -51,6 +50,10 @@ Write-Host "Grating read access to aks resource group '$($mcResourceGroupName)'.
 $mcRG = az group show --name $mcResourceGroupName | ConvertFrom-Json
 az role assignment create --role Reader --assignee $serviceIdentity.principalId --scope $mcRG.id | Out-Null 
 
+# Write-Host "Grating read access to aks resource group '$($defaultResourceGroupName)'..." -ForegroundColor Yellow
+# $rg = az group show --name $defaultResourceGroupName | ConvertFrom-Json
+# az role assignment create --role Reader --assignee $serviceIdentity.principalId --scope $rg.id | Out-Null 
+
 Write-Host "Granting read access to key vault '$vaultName'..." -ForegroundColor Yellow
 $kv = az keyvault show --resource-group $defaultResourceGroupName --name $vaultName | ConvertFrom-Json
 az role assignment create --role Reader --assignee $serviceIdentity.principalId --scope $kv.id | Out-Null
@@ -70,7 +73,6 @@ while (-not (Test-Path (Join-Path $gitRootFolder ".git"))) {
 }
 $srcFolder = Join-Path $gitRootFolder "src"
 $serviceProjFolder = Join-Path $srcFolder "demo-api"
-
 & "$srcFolder\setup.ps1" -serviceImageName $serviceImageName -serviceImageTag $serviceImageTag -serviceProjFolder $serviceProjFolder
 
 Write-Host "4. Deploy service '$serviceName'..." -ForegroundColor White
