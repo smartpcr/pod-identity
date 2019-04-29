@@ -18,6 +18,22 @@ $serviceImageTag = "latest"
 $fullImageName = "$($acrLoginServer)/$($serviceImageName)"
 $aksSpnName = "rrdu-azds-dev-xd-k8s-spn"
 $aksSpn = az ad sp list --display-name $aksSpnName | ConvertFrom-Json
+$appSpnName = "rrdu-azds-dev-xd-wus2-spn"
+$appSpn = az ad sp list --display-name $appSpnName | ConvertFrom-Json
+$appSpnCertName = "rrdu-azds-dev-xd-wus2-spn"
+$secretFolder = Join-Path $env:HOME ".secrets"
+if (-not (Test-Path $secretFolder)) {
+    New-Item -Path $secretFolder -ItemType Directory -Force | Out-Null
+}
+
+$pfxCertFile = Join-Path $secretFolder "$appSpnCertName.pfx"
+$pemCertFile = Join-Path $secretFolder "$appSpnCertName.pem"
+$keyCertFile = Join-Path $secretFolder "$appSpnCertName.key"
+
+Write-Host "Downloading cert '$appSpnCertName' from keyvault '$vaultName' and convert it to private key" 
+az keyvault secret download --vault-name $vaultName -n $appSpnCertName -e base64 -f $pfxCertFile
+openssl pkcs12 -in $pfxCertFile -clcerts -nodes -out $keyCertFile -passin pass:
+openssl rsa -in $keyCertFile -out $pemCertFile
 
 Write-Host "1. Creating managed service identity '$serviceName'..." -ForegroundColor White 
 $msisFound = az identity list --resource-group $mcResourceGroupName --query "[?name=='$serviceName']" | ConvertFrom-Json
@@ -46,8 +62,12 @@ $settings = @{
         resourceGroup = $mcResourceGroupName
         id            = $serviceIdentity.id 
     }
-    aksSpn = @{
+    aksSpn          = @{
         appId = $aksSpn.appId
+    }
+    appSpn          = @{
+        appId = $appSpn.appId
+        certFile = $appSpnCertFile
     }
 }
 
@@ -126,3 +146,5 @@ $serviceContent = $serviceContent.Replace("{{.Values.service.label}}", $settings
 $serviceYamlFile = Join-Path $gitRootFolder "Service.yaml"
 $serviceContent | Out-File $serviceYamlFile -Force 
 kubectl apply -f $serviceYamlFile 
+
+Write-Host "8. Get spn cert..."

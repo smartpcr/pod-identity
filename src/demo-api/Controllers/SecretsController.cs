@@ -4,34 +4,42 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Options;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
 
 namespace demo_api.Controllers
 {
     public class VaultSetting
     {
         public string VaultName { get; set; }
+        public string ClientId { get; set; }
+        public string CertFile { get; set; }
     }
 
     [Route("api/[controller]")]
     [ApiController]
     public class SecretsController : ControllerBase
     {
-        public SecretsController(IConfiguration config)
+        private readonly string _vaultUrl;
+
+        public SecretsController(IKeyVaultClient kvClient, IOptions<VaultSetting> vaultSettings)
         {
-            Config = config;
+            KeyVaultClient = kvClient;
+            _vaultUrl = $"https://{vaultSettings.Value.VaultName}.vault.azure.net";
         }
 
-        public IConfiguration Config { get; }
+        public IKeyVaultClient KeyVaultClient { get; }
 
         [HttpGet]
-        public ActionResult<IEnumerable<KeyValuePair<string, string>>> Get()
+        public async Task<IEnumerable<KeyValuePair<string, string>>> Get()
         {
-            var secretNames = new List<KeyValuePair<string, string>>();
-            foreach(var kvp in Config.AsEnumerable())
+            var secrets = new List<KeyValuePair<string, string>>();
+            var items = await KeyVaultClient.GetSecretsAsync(_vaultUrl);
+            foreach(var item in items)
             {
-                secretNames.Add(kvp);
+                var secret = await KeyVaultClient.GetSecretAsync(item.Identifier.Identifier);
+                secrets.Add(new KeyValuePair<string, string>(item.Id, secret.Value));
             }
-            return secretNames;
+            return secrets;
         }
     }
 }

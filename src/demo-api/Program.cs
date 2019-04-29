@@ -24,27 +24,6 @@ namespace demo_api
                     configBuilder.AddJsonFile("appsettings.json", optional: false, reloadOnChange: true);
                     configBuilder.AddEnvironmentVariables();
                     configBuilder.AddCommandLine(args);
-                    var config = configBuilder.Build();
-
-                    if (context.HostingEnvironment.IsProduction())
-                    {
-                        var azureServiceTokenProvider = new AzureServiceTokenProvider();
-                        var keyVaultClient = new KeyVaultClient(
-                            new KeyVaultClient.AuthenticationCallback(
-                                azureServiceTokenProvider.KeyVaultTokenCallback));
-                        configBuilder.AddAzureKeyVault(
-                            $"https://{config["Vault:VaultName"]}.vault.azure.net",
-                            keyVaultClient,
-                            new DefaultKeyVaultSecretManager());
-                    }
-                    else
-                    {
-                        configBuilder.AddAzureKeyVault(
-                            $"https://{config["Vault:VaultName"]}.vault.azure.net",
-                            config["Vault:ClientId"],
-                            config["Vault:ClientSecret"],
-                            new DefaultKeyVaultSecretManager());
-                    }
                 })
                 .UseStartup<Startup>();
             return builder;
