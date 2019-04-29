@@ -9,6 +9,8 @@ $serviceName = "demo"
 
 $acrName = "rrdudevacr"
 $acr = az acr show -g $defaultResourceGroupName -n $acrName | ConvertFrom-Json
+$acrPassword = "$(az acr credential show -n $acrName --query ""passwords[0].value"")"
+$acrOwnerEmail = "lingxd@gmail.com"
 $acrLoginServer = $acr.loginServer
 $serviceImageName = "test/$($serviceName)"
 $serviceImageTag = "latest"
@@ -25,15 +27,8 @@ else {
 }
 $serviceIdentity = az identity show --resource-group $defaultResourceGroupName --name $serviceName | ConvertFrom-Json
 
-Write-Host "Grating read access to aks resource group '$($mcResourceGroupName)'..." -ForegroundColor Yellow
-$mcRG = az group show --name $mcResourceGroupName | ConvertFrom-Json
-az role assignment create --role Reader --assignee $serviceIdentity.principalId --scope $mcRG.id | Out-Null 
 
-Write-Host "Granting read access to key vault '$vaultName'..." -ForegroundColor Yellow
-$kv = az keyvault show --resource-group $defaultResourceGroupName --name $vaultName | ConvertFrom-Json
-az role assignment create --role Reader --assignee $serviceIdentity.principalId --scope $kv.id | Out-Null
 
-Write-Host "2. Creating setting..." -ForegroundColor White
 $settings = @{
     subscriptionId  = $azAccount.id
     service         = @{
@@ -52,6 +47,22 @@ $settings = @{
     }
 }
 
+Write-Host "Grating read access to aks resource group '$($mcResourceGroupName)'..." -ForegroundColor Yellow
+$mcRG = az group show --name $mcResourceGroupName | ConvertFrom-Json
+az role assignment create --role Reader --assignee $serviceIdentity.principalId --scope $mcRG.id | Out-Null 
+
+Write-Host "Granting read access to key vault '$vaultName'..." -ForegroundColor Yellow
+$kv = az keyvault show --resource-group $defaultResourceGroupName --name $vaultName | ConvertFrom-Json
+az role assignment create --role Reader --assignee $serviceIdentity.principalId --scope $kv.id | Out-Null
+
+
+Write-Host "2. Setup ACR connection as secret in AKS..."
+kubectl create secret docker-registry acr-auth `
+    --docker-server $acrLoginServer `
+    --docker-username $acrName `
+    --docker-password $acrPassword `
+    --docker-email $acrOwnerEmail
+
 Write-Host "3. Build docker image and push to acr..." -ForegroundColor White
 $gitRootFolder = if ($PSScriptRoot) { $PSScriptRoot } else { Get-Location }
 while (-not (Test-Path (Join-Path $gitRootFolder ".git"))) {
@@ -66,8 +77,6 @@ Write-Host "4. Deploy service '$serviceName'..." -ForegroundColor White
 $templatesFolder = Join-Path $gitRootFolder "templates"
 $deployTemplateFile = Join-Path $templatesFolder "deployment.tpl"
 $deploymentContent = Get-Content $deployTemplateFile -Raw 
-
-
 $deploymentContent = $deploymentContent.Replace("{{.Values.subscriptionId}}", $settings.subscriptionId)
 $deploymentContent = $deploymentContent.Replace("{{.Values.service.namespace}}", $settings.service.namespace)
 $deploymentContent = $deploymentContent.Replace("{{.Values.service.name}}", $settings.service.name)
@@ -78,7 +87,6 @@ $deploymentContent = $deploymentContent.Replace("{{.Values.serviceIdentity.clien
 $deploymentContent = $deploymentContent.Replace("{{.Values.serviceIdentity.resourceGroup}}", $settings.serviceIdentity.resourceGroup)
 $deploymentYamlFile = Join-Path $gitRootFolder "deployment.yaml"
 $deploymentContent | Out-File $deploymentYamlFile -Force | Out-Null
-
 kubectl apply -f $deploymentYamlFile
 
 Write-Host "5. Deploy pod identity..." -ForegroundColor White 

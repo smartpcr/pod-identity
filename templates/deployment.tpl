@@ -16,6 +16,8 @@ spec:
       containers:
       - name: {{.Values.service.name}}
         image: "{{.Values.service.image.name}}:{{.Values.service.image.tag}}"
+        imagePullSecrets:
+        - name: acr-auth
         imagePullPolicy: Always 
         args:
           - "--subscriptionid={{.Values.subscriptionId}}"
