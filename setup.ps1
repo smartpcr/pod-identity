@@ -75,7 +75,7 @@ Write-Host "Granting read access to aks resource group '$($mcResourceGroupName)'
 $mcRG = az group show --name $mcResourceGroupName | ConvertFrom-Json
 az role assignment create --role Reader --assignee $serviceIdentity.principalId --scope $mcRG.id | Out-Null 
 
-Write-Host "Grating read access to aks resource group '$($defaultResourceGroupName)'..." -ForegroundColor Yellow
+Write-Host "Granting read access to aks resource group '$($defaultResourceGroupName)'..." -ForegroundColor Yellow
 $rg = az group show --name $defaultResourceGroupName | ConvertFrom-Json
 az role assignment create --role Reader --assignee $serviceIdentity.principalId --scope $rg.id | Out-Null 
 
