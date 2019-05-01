@@ -1,4 +1,5 @@
 ﻿using demo_api.Controllers;
+using demo_api.Features;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc;
@@ -50,8 +51,10 @@ namespace demo_api
                 keyVaultClient = new KeyVaultClient(callback);
             }
             services.AddSingleton(keyVaultClient);
-
             services.AddMvc().SetCompatibilityVersion(CompatibilityVersion.Version_2_2);
+
+            services.AddOptions();
+            services.Configure<FeatureFlags>("Features", Configuration);
         }
 
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.

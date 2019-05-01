@@ -7,7 +7,7 @@ namespace FeatureFlagClient
 {
     class ProgramOptions
     {
-        [Option('v', "verbose", Default = false, HelpText = "Enable verbose logging.")]
+        [Option('l', "verbose", Default = false, HelpText = "Enable verbose logging.")]
         public bool Verbose { get; set; }
 
         [Option('n', "namespace", Default = "default", HelpText = "K8S namespace where configmap will be created")]
@@ -19,10 +19,10 @@ namespace FeatureFlagClient
         [Option('k', "key", HelpText = "Key of feature flag")]
         public string Key { get; set; }
 
-        [Option('f', "value", HelpText = "Value of feature flag")]
+        [Option('v', "value", HelpText = "Value of feature flag")]
         public string Value { get; set; }
 
-        [Option('d', "file", HelpText = "Json file of feature flag data")]
+        [Option('f', "file", HelpText = "Json file of feature flag data")]
         public string JsonFile { get; set; }
 
         public static ProgramOptions Parse(string[] args)

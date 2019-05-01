@@ -2,6 +2,8 @@
 using Microsoft.AspNetCore;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
+using Serilog;
 using System.IO;
 
 namespace demo_api
@@ -15,8 +17,10 @@ namespace demo_api
 
         public static IWebHostBuilder CreateWebHostBuilder(string[] args)
         {
+            ILoggerFactory loggerFactory = ConfigureLogging();
+
             var builder = WebHost.CreateDefaultBuilder(args)
-                .ConfigureAppConfiguration((context, configBuilder) =>
+                .ConfigureAppConfiguration(configBuilder =>
                 {
                     configBuilder.SetBasePath(Directory.GetCurrentDirectory());
                     configBuilder.AddJsonFile("appsettings.json", optional: false, reloadOnChange: true);
@@ -25,10 +29,21 @@ namespace demo_api
                     var config = configBuilder.Build();
                     var configMap = new ConfigMapOption();
                     config.Bind("ConfigMap", configMap);
-                    configBuilder.AddFeatureFlags(configMap);
+                    configBuilder.AddFeatureFlags(loggerFactory, configMap);
                 })
                 .UseStartup<Startup>();
             return builder;
+        }
+
+        static ILoggerFactory ConfigureLogging()
+        {
+            var loggerConfiguration = new LoggerConfiguration()
+                .MinimumLevel.Information()
+                .WriteTo.Console(
+                    outputTemplate: "[{Timestamp:HH:mm:ss} {Level:u3}] {Message:l}{NewLine}{Exception}"
+                );
+            Log.Logger = loggerConfiguration.CreateLogger();
+            return new LoggerFactory().AddSerilog(Log.Logger);
         }
     }
 }
