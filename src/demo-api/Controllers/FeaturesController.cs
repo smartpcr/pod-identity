@@ -24,7 +24,7 @@ namespace demo_api.Controllers
         public ILogger<FeaturesController> Logger { get; }
 
         [HttpGet]
-        public Task<List<KeyValuePair<string, string>>> Get()
+        public List<KeyValuePair<string, string>> Get()
         {
             // return $"UsePodIdentity={FeatureFlags.UsePodIdentity}";
             var features = new List<KeyValuePair<string, string>>();
