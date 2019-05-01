@@ -147,4 +147,3 @@ $serviceYamlFile = Join-Path $gitRootFolder "Service.yaml"
 $serviceContent | Out-File $serviceYamlFile -Force 
 kubectl apply -f $serviceYamlFile 
 
-Write-Host "8. Get spn cert..."

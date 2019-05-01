@@ -1,9 +1,7 @@
-﻿using Microsoft.AspNetCore;
+﻿using demo_api.Features;
+using Microsoft.AspNetCore;
 using Microsoft.AspNetCore.Hosting;
-using Microsoft.Azure.KeyVault;
-using Microsoft.Azure.Services.AppAuthentication;
 using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.Configuration.AzureKeyVault;
 using System.IO;
 
 namespace demo_api
@@ -24,6 +22,10 @@ namespace demo_api
                     configBuilder.AddJsonFile("appsettings.json", optional: false, reloadOnChange: true);
                     configBuilder.AddEnvironmentVariables();
                     configBuilder.AddCommandLine(args);
+                    var config = configBuilder.Build();
+                    var configMap = new ConfigMapOption();
+                    config.Bind("ConfigMap", configMap);
+                    configBuilder.AddFeatureFlags(configMap);
                 })
                 .UseStartup<Startup>();
             return builder;

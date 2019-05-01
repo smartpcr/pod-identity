@@ -1,9 +1,7 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using Microsoft.Azure.KeyVault;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Options;
 using System.Collections.Generic;
-using System.Linq;
 using System.Threading.Tasks;
 
 namespace demo_api.Controllers
