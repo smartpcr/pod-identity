@@ -9,6 +9,7 @@ using KubeClient;
 using KubeClient.Models;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using Serilog;
 
 namespace FeatureFlagClient
@@ -39,6 +40,12 @@ namespace FeatureFlagClient
                 ConfigMapV1 configMap = await client.ConfigMapsV1().Get(options.Name, options.Namespace);
                 if (configMap != null)
                 {
+                    if (string.IsNullOrEmpty(options.Key) || string.IsNullOrEmpty(options.Value))
+                    {
+                        Log.Error("Key and value must be provided from command line");
+                        return ExitCodes.InvalidArguments;
+                    }
+
                     Log.Information("Found existing ConfigMap...");
                     configMap.Data[options.Key] = options.Value;
 
@@ -58,7 +65,8 @@ namespace FeatureFlagClient
                     }
 
                     Log.Information("Creating new ConfigMap {Name}...", options.Name);
-                    var data = JsonConvert.DeserializeObject<Dictionary<string, string>>(File.ReadAllText(options.JsonFile));
+                    var jtoken = JToken.Parse(File.ReadAllText(options.JsonFile));
+                    var settings = FlattenSettings(jtoken);
 
                     var configMapToCreate = new ConfigMapV1
                     {
@@ -68,9 +76,9 @@ namespace FeatureFlagClient
                             Namespace = options.Namespace
                         }
                     };
-                    foreach (var key in data.Keys)
+                    foreach (var key in settings.Keys)
                     {
-                        configMapToCreate.Data.Add(key, data[key]);
+                        configMapToCreate.Data.Add(key, settings[key]);
                     }
 
                     configMap = await client.ConfigMapsV1().Create(configMapToCreate);
@@ -114,6 +122,38 @@ namespace FeatureFlagClient
 
             return new LoggerFactory().AddSerilog(Log.Logger);
         }
+
+
+        private static Dictionary<string, string> FlattenSettings(JToken settings, string parentPath = null)
+        {
+            var output = new Dictionary<string, string>();
+            if (settings is JValue val)
+            {
+                output.Add(parentPath, val.Value<string>());
+            }
+            if (settings is JProperty prop)
+            {
+                output.Add(prop.Name, prop.Value<string>());
+            }
+            if (settings is JObject obj)
+            {
+                foreach (JProperty property in obj.Properties())
+                {
+                    var childPath = string.IsNullOrEmpty(parentPath) ? property.Name : parentPath + "." + property.Name;
+                    var childSettings = FlattenSettings(property.Value, childPath);
+                    if (childSettings != null && childSettings.Count > 0)
+                    {
+                        foreach (var key in childSettings.Keys)
+                        {
+                            output.Add(key, childSettings[key]);
+                        }
+                    }
+                }
+            }
+
+            return output;
+        }
+
     }
 
     public static class ExitCodes

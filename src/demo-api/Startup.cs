@@ -54,7 +54,7 @@ namespace demo_api
             services.AddMvc().SetCompatibilityVersion(CompatibilityVersion.Version_2_2);
 
             services.AddOptions();
-            services.Configure<FeatureFlags>("Features", Configuration);
+            services.Configure<FeatureFlags>(Configuration.GetSection("Features"));
         }
 
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.

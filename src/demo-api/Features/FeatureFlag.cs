@@ -4,8 +4,7 @@ namespace demo_api.Features
 {
     public class FeatureFlags
     {
-        [JsonProperty("usePodIdentity")]
-        public bool UsePodIdentity { get; set; }
+        public string UsePodIdentity { get; set; }
     }
 
     public class ConfigMapOption

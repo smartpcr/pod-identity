@@ -17,8 +17,7 @@ namespace demo_api
 
         public static IWebHostBuilder CreateWebHostBuilder(string[] args)
         {
-            ILoggerFactory loggerFactory = ConfigureLogging();
-
+            var loggerFactory = ConfigureLogging();
             var builder = WebHost.CreateDefaultBuilder(args)
                 .ConfigureAppConfiguration(configBuilder =>
                 {

@@ -13,7 +13,7 @@ namespace demo_api.Features
             ConfigMapOption configMap)
         {
             var logger = loggerFactory.CreateLogger(typeof(FeatureFlagBuilder));
-            logger.LogInformation("setting up configmap, {name}, {namespace}", configMap.Name, configMap.Namespace);
+            logger.LogWarning("setting up configmap, {name}, {namespace}", configMap.Name, configMap.Namespace);
 
             KubeClientOptions clientOptions = KubeClientOptions.FromPodServiceAccount();
             builder.AddKubeConfigMap(clientOptions, configMapName: configMap.Name, reloadOnChange: true);
