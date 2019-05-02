@@ -139,3 +139,19 @@ $serviceYamlFile = Join-Path $gitRootFolder "Service.yaml"
 $serviceContent | Out-File $serviceYamlFile -Encoding UTF8 -Force | Out-Null
 kubectl apply -f $serviceYamlFile 
 
+Write-Host "8. Granting permission to read config map in its own namespace..."
+$configReaderTemplateFile = Join-Path $templatesFolder "ConfigReader.tpl"
+$configReaderContent = Get-Content $configReaderTemplateFile -Raw 
+$configReaderContent = $configReaderContent.Replace("{{.Values.service.name}}", $settings.service.name)
+$configReaderContent = $configReaderContent.Replace("{{.Values.service.namespace}}", $settings.service.namespace)
+$configReaderYamlFile = Join-Path $gitRootFolder "ConfigReaderRole.yaml"
+$configReaderContent | Out-File $configReaderYamlFile -Encoding UTF8 -Force | Out-Null
+kubectl apply -f $configReaderYamlFile 
+
+$roleBindingTemplateFile = Join-Path $templatesFolder "ConfigReaderRoleBinding.tpl"
+$roleBindingContent = Get-Content $roleBindingTemplateFile -Raw 
+$roleBindingContent = $roleBindingContent.Replace("{{.Values.service.name}}", $settings.service.name)
+$roleBindingContent = $roleBindingContent.Replace("{{.Values.service.namespace}}", $settings.service.namespace)
+$roleBindingYamlFile = Join-Path $gitRootFolder "ConfigReaderRoleBinding.yaml"
+$roleBindingContent | Out-File $roleBindingYamlFile -Encoding UTF8 -Force | Out-Null
+kubectl apply -f $roleBindingYamlFile 
