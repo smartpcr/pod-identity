@@ -1,5 +1,4 @@
 ﻿using System.Collections.Generic;
-using System.Threading.Tasks;
 using demo_api.Features;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.ModelBinding;
@@ -13,14 +12,14 @@ namespace demo_api.Controllers
     [ApiController]
     public class FeaturesController : ControllerBase
     {
-        public FeaturesController(IConfiguration config, IOptionsMonitor<FeatureFlags> featureFlags, ILogger<FeaturesController> logger)
+        public FeaturesController(IConfiguration config, IOptionsSnapshot<FeatureFlags> featureFlags, ILogger<FeaturesController> logger)
         {
             FeatureFlags = featureFlags;
             Config = config;
             Logger = logger;
         }
 
-        public IOptionsMonitor<FeatureFlags> FeatureFlags { get; }
+        public IOptionsSnapshot<FeatureFlags> FeatureFlags { get; }
         public IConfiguration Config { get; }
         public ILogger<FeaturesController> Logger { get; }
 
@@ -52,7 +51,7 @@ namespace demo_api.Controllers
             if (name.Equals("UsePodIdentity"))
             {
                 Logger.LogWarning("Returning feature flag: {name}={value}", name, FeatureFlags.CurrentValue.UsePodIdentity);
-                return FeatureFlags.CurrentValue.UsePodIdentity;
+                return FeatureFlags.Value.UsePodIdentity;
             }
 
             return "Unknown";
