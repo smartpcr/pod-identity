@@ -106,7 +106,7 @@ $deploymentContent = $deploymentContent.Replace("{{.Values.service.image.tag}}",
 $deploymentContent = $deploymentContent.Replace("{{.Values.serviceIdentity.clientId}}", $settings.serviceIdentity.clientId)
 $deploymentContent = $deploymentContent.Replace("{{.Values.serviceIdentity.resourceGroup}}", $settings.serviceIdentity.resourceGroup)
 $deploymentYamlFile = Join-Path $gitRootFolder "deployment.yaml"
-$deploymentContent | Out-File $deploymentYamlFile -Force | Out-Null
+$deploymentContent | Out-File $deploymentYamlFile -Force -Encoding UTF8 | Out-Null
 kubectl apply -f $deploymentYamlFile
 
 Write-Host "5. Deploy pod identity..." -ForegroundColor White 
@@ -116,7 +116,7 @@ $podIdentityContent = $podIdentityContent.Replace("{{.Values.service.name}}", $s
 $podIdentityContent = $podIdentityContent.Replace("{{.Values.serviceIdentity.id}}", $settings.serviceIdentity.id)
 $podIdentityContent = $podIdentityContent.Replace("{{.Values.serviceIdentity.clientId}}", $settings.serviceIdentity.clientId)
 $podIdentityYamlFile = Join-Path $gitRootFolder "AadPodIdentity.yaml"
-$podIdentityContent | Out-File $podIdentityYamlFile -Force 
+$podIdentityContent | Out-File $podIdentityYamlFile -Encoding UTF8 -Force | Out-Null
 kubectl apply -f $podIdentityYamlFile 
 
 Write-Host "6. Deploy pod identity binding..." -ForegroundColor White 
@@ -125,7 +125,7 @@ $identityBindingContent = Get-Content $identityBindingTemplateFile -Raw
 $identityBindingContent = $identityBindingContent.Replace("{{.Values.service.name}}", $settings.service.name)
 $identityBindingContent = $identityBindingContent.Replace("{{.Values.service.label}}", $settings.service.label)
 $identityBindingYamlFile = Join-Path $gitRootFolder "AadPodIdentityBinding.yaml"
-$identityBindingContent | Out-File $identityBindingYamlFile -Force 
+$identityBindingContent | Out-File $identityBindingYamlFile -Encoding UTF8 -Force | Out-Null
 kubectl apply -f $identityBindingYamlFile 
 
 Write-Host "7. Deploy service and expose api endpoint..."
@@ -134,6 +134,6 @@ $serviceContent = Get-Content $serviceTemplateFile -Raw
 $serviceContent = $serviceContent.Replace("{{.Values.service.name}}", $settings.service.name)
 $serviceContent = $serviceContent.Replace("{{.Values.service.label}}", $settings.service.label)
 $serviceYamlFile = Join-Path $gitRootFolder "Service.yaml"
-$serviceContent | Out-File $serviceYamlFile -Force 
+$serviceContent | Out-File $serviceYamlFile -Encoding UTF8 -Force | Out-Null
 kubectl apply -f $serviceYamlFile 
 
