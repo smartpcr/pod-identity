@@ -1,5 +1,8 @@
 ﻿using System.Collections.Generic;
+using System.Threading.Tasks;
 using demo_api.Features;
+using KubeClient;
+using KubeClient.Models;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.ModelBinding;
 using Microsoft.Extensions.Configuration;
@@ -12,46 +15,53 @@ namespace demo_api.Controllers
     [ApiController]
     public class FeaturesController : ControllerBase
     {
-        public FeaturesController(IConfiguration config, IOptionsSnapshot<FeatureFlags> featureFlags, ILogger<FeaturesController> logger)
+        public FeaturesController(
+            IConfiguration config, 
+            IOptionsSnapshot<FeatureFlags> featureFlags,
+            IKubeApiClient kubeApiClient,
+            ILogger<FeaturesController> logger)
         {
             FeatureFlags = featureFlags;
+            KubeApiClient = kubeApiClient;
             Config = config;
             Logger = logger;
         }
 
         public IOptionsSnapshot<FeatureFlags> FeatureFlags { get; }
+        public IKubeApiClient KubeApiClient { get; }
         public IConfiguration Config { get; }
         public ILogger<FeaturesController> Logger { get; }
 
         [HttpGet]
-        public List<KeyValuePair<string, string>> Get()
+        public async Task<List<KeyValuePair<string, string>>> Get()
         {
-            // return $"UsePodIdentity={FeatureFlags.UsePodIdentity}";
             var features = new List<KeyValuePair<string, string>>();
-
-            foreach (var kvp in Config.AsEnumerable())
+            ConfigMapV1 configMap = await KubeApiClient.ConfigMapsV1().Get("test", "default");
+            if (configMap != null)
             {
-                Logger.LogWarning("{key}={value}", kvp.Key, kvp.Value);
-                features.Add(new KeyValuePair<string, string>(kvp.Key, kvp.Value));
-                //if (kvp.Key.StartsWith("feature:"))
-                //{
-                //    var key = kvp.Key.Substring("feature:".Length);
-                //    features.Add(new KeyValuePair<string, string>(key, kvp.Value));
-                //}
+                foreach(var name in configMap.Data.Keys)
+                {
+                    features.Add(new KeyValuePair<string, string>(name, configMap.Data[name]));
+                }
             }
-
+                
             return features;
         }
 
         [HttpGet("{name}")]
-        public string GetFeatureFlag([BindRequired]string name)
+        public async Task<string> GetFeatureFlag([BindRequired]string name)
         {
             Logger.LogWarning("Getting feature flat: {name}", name);
 
-            if (name.Equals("UsePodIdentity"))
+            ConfigMapV1 configMap = await KubeApiClient.ConfigMapsV1().Get("test", "default");
+            if (configMap != null)
             {
-                Logger.LogWarning("Returning feature flag: {name}={value}", name, FeatureFlags.Value.UsePodIdentity);
-                return FeatureFlags.Value.UsePodIdentity;
+                if (configMap.Data.ContainsKey(name))
+                {
+                    var value = configMap.Data[name];
+                    Logger.LogInformation("Found feature: {name}={value}", name, value);
+                    return value;
+                }
             }
 
             return "Unknown";

@@ -1,4 +1,9 @@
 
+$gitRootFolder = if ($PSScriptRoot) { $PSScriptRoot } else { Get-Location }
+while (-not (Test-Path (Join-Path $gitRootFolder ".git"))) {
+    $gitRootFolder = Split-Path $gitRootFolder -Parent 
+}
+
 # assumes you are already logged in to azure 
 $defaultResourceGroupName = "azds-dev-rg"
 $aksClusterName = "rrdu-azds-k8s-dev"
@@ -85,10 +90,7 @@ kubectl create secret docker-registry acr-auth `
     --docker-email $acrOwnerEmail
 
 Write-Host "3. Build docker image and push to acr..." -ForegroundColor White
-$gitRootFolder = if ($PSScriptRoot) { $PSScriptRoot } else { Get-Location }
-while (-not (Test-Path (Join-Path $gitRootFolder ".git"))) {
-    $gitRootFolder = Split-Path $gitRootFolder -Parent 
-}
+
 $srcFolder = Join-Path $gitRootFolder "src"
 $serviceProjFolder = Join-Path $srcFolder "demo-api"
 & "$srcFolder\setup.ps1" -serviceImageName $serviceImageName -serviceImageTag $serviceImageTag -serviceProjFolder $serviceProjFolder

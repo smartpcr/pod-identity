@@ -16,10 +16,11 @@ namespace demo_api
     public class Startup
     {
         private readonly ILogger<Startup> _logger;
-
+        private readonly ILoggerFactory _loggerFactory;
         public Startup(IHostingEnvironment env, ILoggerFactory loggerFactory, IConfiguration configuration)
         {
             Env = env;
+            _loggerFactory = loggerFactory;
             _logger = loggerFactory.CreateLogger<Startup>();
 
             Configuration = configuration;
@@ -61,6 +62,7 @@ namespace demo_api
             services.AddSingleton(keyVaultClient);
             services.AddMvc().SetCompatibilityVersion(CompatibilityVersion.Version_2_2);
 
+            services.AddKubeClient(_loggerFactory);
             services.AddOptions();
             services.Configure<FeatureFlags>(Configuration.GetSection("Features"));
         }

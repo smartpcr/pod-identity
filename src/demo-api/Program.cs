@@ -20,7 +20,7 @@ namespace demo_api
             var loggerFactory = ConfigureLogging();
 
             var builder = WebHost.CreateDefaultBuilder(args)
-                .ConfigureAppConfiguration(configBuilder =>
+                .ConfigureAppConfiguration((_, configBuilder) =>
                 {
                     configBuilder.SetBasePath(Directory.GetCurrentDirectory());
                     configBuilder.AddJsonFile("appsettings.json", optional: false, reloadOnChange: true);
