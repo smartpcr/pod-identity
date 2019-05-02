@@ -50,7 +50,7 @@ namespace demo_api.Controllers
 
             if (name.Equals("UsePodIdentity"))
             {
-                Logger.LogWarning("Returning feature flag: {name}={value}", name, FeatureFlags.CurrentValue.UsePodIdentity);
+                Logger.LogWarning("Returning feature flag: {name}={value}", name, FeatureFlags.Value.UsePodIdentity);
                 return FeatureFlags.Value.UsePodIdentity;
             }
 

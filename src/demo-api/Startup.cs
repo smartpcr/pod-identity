@@ -15,21 +15,17 @@ namespace demo_api
 {
     public class Startup
     {
-        public Startup(IHostingEnvironment env, ILoggerFactory loggerFactory)
+        private readonly ILogger<Startup> _logger;
+
+        public Startup(IHostingEnvironment env, ILoggerFactory loggerFactory, IConfiguration configuration)
         {
             Env = env;
+            _logger = loggerFactory.CreateLogger<Startup>();
 
-            var builder = new ConfigurationBuilder()
-                .SetBasePath(env.ContentRootPath)
-                .AddJsonFile("appsettings.json", optional: false, reloadOnChange: true)
-                .AddJsonFile($"appsettings.{env.EnvironmentName}.json", optional: true)
-                .AddEnvironmentVariables();
-            Configuration = builder.Build();
+            Configuration = configuration;
 
-            var configMap = new ConfigMapOption();
-            Configuration.Bind("ConfigMap", configMap);
-
-            builder.AddFeatureFlags(loggerFactory, configMap);
+            var reloadToken = Configuration.GetReloadToken();
+            reloadToken.RegisterChangeCallback(OnConfigChanged, state: null);
         }
 
         public IConfiguration Configuration { get; private set; }
@@ -85,6 +81,19 @@ namespace demo_api
 
             app.UseHttpsRedirection();
             app.UseMvc();
+        }
+
+        void OnConfigChanged(object state)
+        {
+            _logger.LogWarning("Configuration changed");
+            foreach(var item in Configuration.AsEnumerable())
+            {
+                _logger.LogInformation("{name}={value}", item.Key, item.Value);
+            }
+
+            // Reload tokens only work once, then you need a new one.
+            var reloadToken = Configuration.GetReloadToken();
+            reloadToken.RegisterChangeCallback(OnConfigChanged, state: null);
         }
     }
 }
