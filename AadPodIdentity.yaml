@@ -1,8 +1,8 @@
-﻿apiVersion: "aadpodidentity.k8s.io/v1"
+apiVersion: "aadpodidentity.k8s.io/v1"
 kind: AzureIdentity 
 metadata:
   name: demo
 spec:
   type: 0
-  ResourceID: /subscriptions/c6f1efb8-906b-437e-99b4-e1f0881ec8d2/resourcegroups/MC_azds-dev-rg_rrdu-azds-k8s-dev_westus2/providers/Microsoft.ManagedIdentity/userAssignedIdentities/demo
-  ClientId: 66dc37f8-07f7-4682-b838-f3c3b1ad4751
+  ResourceID: /subscriptions/f921dcc4-9d2c-4b73-a12e-8c3ca091af03/resourcegroups/MC_azds-rg_xiaodong-azds-dev_westus2/providers/Microsoft.ManagedIdentity/userAssignedIdentities/demo
+  ClientId: eaa35d00-da73-4213-bcaf-988c1735937d

@@ -1,10 +1,11 @@
 param(
     [string] $serviceImageName,
     [string] $serviceImageTag,
-    [string] $serviceProjFolder 
+    [string] $serviceProjFolder,
+    [string] $defaultResourceGroupName
 )
 
-$acrName = "rrdudevacr"
+$acrName = "oneesdevacr"
 $acr = az acr show -g $defaultResourceGroupName -n $acrName | ConvertFrom-Json
 $acrLoginServer = $acr.loginServer
 $imageName = "$($acrLoginServer)/$($serviceImageName)"

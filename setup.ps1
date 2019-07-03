@@ -5,25 +5,25 @@ while (-not (Test-Path (Join-Path $gitRootFolder ".git"))) {
 }
 
 # assumes you are already logged in to azure 
-$defaultResourceGroupName = "azds-dev-rg"
-$aksClusterName = "rrdu-azds-k8s-dev"
+$defaultResourceGroupName = "azds-rg"
+$aksClusterName = "xiaodong-azds-dev"
 $location = "westus2"
-$vaultName = "rrdu-kv"
+$vaultName = "xiaodong-kv"
 $azAccount = az account show | ConvertFrom-Json
 $mcResourceGroupName = "MC_$($defaultResourceGroupName)_$($aksClusterName)_$($location)"
 $serviceName = "demo"
 
-$acrName = "rrdudevacr"
+$acrName = "oneesdevacr"
 $acr = az acr show -g $defaultResourceGroupName -n $acrName | ConvertFrom-Json
 $acrPassword = "$(az acr credential show -n $acrName --query ""passwords[0].value"")"
-$acrOwnerEmail = "lingxd@gmail.com"
+$acrOwnerEmail = "xiaodoli@microsoft.com"
 $acrLoginServer = $acr.loginServer
 $serviceImageName = "test/$($serviceName)"
 $serviceImageTag = "latest"
 $fullImageName = "$($acrLoginServer)/$($serviceImageName)"
-$aksSpnName = "rrdu-azds-dev-xd-k8s-spn"
+$aksSpnName = "App Center AKS AAD (non-production)"
 $aksSpn = az ad sp list --display-name $aksSpnName | ConvertFrom-Json
-$appSpnName = "rrdu-azds-dev-xd-wus2-spn"
+$appSpnName = "onees-space-dev-xiaodong-wus2-spn"
 $appSpn = az ad sp list --display-name $appSpnName | ConvertFrom-Json
 
 Write-Host "0. Deploy aad-pod-identity infra.."
@@ -61,7 +61,7 @@ $settings = @{
         appId = $aksSpn.appId
     }
     appSpn          = @{
-        appId = $appSpn.appId
+        appId    = $appSpn.appId
         certFile = $appSpnCertFile
     }
 }
@@ -78,6 +78,7 @@ Write-Host "Granting read access to key vault '$vaultName'..." -ForegroundColor 
 $kv = az keyvault show --resource-group $defaultResourceGroupName --name $vaultName | ConvertFrom-Json
 az role assignment create --role Reader --assignee $serviceIdentity.principalId --scope $kv.id | Out-Null
 az keyvault set-policy -n $vaultName --secret-permissions get list --spn $serviceIdentity.clientId | Out-Null
+az keyvault set-policy -n $vaultName --certificate-permissions get list --spn $serviceIdentity.clientId | Out-Null
 
 Write-Host "Granting aks spn access to managed identity..."
 az role assignment create --role "Managed Identity Operator" --assignee $aksSpn.appId --scope $serviceIdentity.id | Out-Null
@@ -93,7 +94,11 @@ Write-Host "3. Build docker image and push to acr..." -ForegroundColor White
 
 $srcFolder = Join-Path $gitRootFolder "src"
 $serviceProjFolder = Join-Path $srcFolder "demo-api"
-& "$srcFolder\setup.ps1" -serviceImageName $serviceImageName -serviceImageTag $serviceImageTag -serviceProjFolder $serviceProjFolder
+& "$srcFolder\setup.ps1" `
+    -serviceImageName $serviceImageName `
+    -serviceImageTag $serviceImageTag `
+    -serviceProjFolder $serviceProjFolder `
+    -defaultResourceGroupName $defaultResourceGroupName
 
 Write-Host "4. Deploy service '$serviceName'..." -ForegroundColor White
 $templatesFolder = Join-Path $gitRootFolder "templates"
