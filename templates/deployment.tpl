@@ -1,5 +1,5 @@
 apiVersion: extensions/v1beta1
-kind: Deployment 
+kind: Deployment
 metadata:
   labels:
     app: "{{.Values.service.name}}"
@@ -16,25 +16,34 @@ spec:
       containers:
       - name: {{.Values.service.name}}
         image: "{{.Values.service.image.name}}:{{.Values.service.image.tag}}"
-        imagePullPolicy: Always 
+        imagePullPolicy: Always
         args:
           - "--subscriptionid={{.Values.subscriptionId}}"
           - "--clientid={{.Values.serviceIdentity.clientId}}"
           - "--resourcegroup={{.Values.serviceIdentity.resourceGroup}}"
           - "--aad-resourcename=https://vault.azure.net"
         env:
-        - name: MY_POD_NAME
-          valueFrom:
-            fieldRef:
-              fieldPath: metadata.name 
-        - name: MY_POD_NAMESPACE 
-          valueFrom:
-            fieldRef:
-              fieldPath: metadata.namespace
-        - name: MY_POD_IP 
-          valueFrom:
-            fieldRef:
-              fieldPath: status.podIP
+          - name: MY_POD_NAME
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.name
+          - name: MY_POD_NAMESPACE
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.namespace
+          - name: MY_POD_IP
+            valueFrom:
+              fieldRef:
+                fieldPath: status.podIP
+        volumeMounts:
+          - name: ca-pemstore
+            mountPath: /etc/ssl/certs/my-cert.pem
+            subPath: my-cert.pem
+            readOnly: false
       imagePullSecrets:
-      - name: acr-auth
-        
+        - name: acr-auth
+      volumes:
+        - name: ca-permstore
+          configMap:
+            name: ca-pemstore
+
