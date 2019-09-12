@@ -5,9 +5,22 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Serilog;
 using System.IO;
+using Microsoft.AspNetCore.Server.Kestrel.Https;
+using System.Net;
 
 namespace demo_api
 {
+    public static class WebHostBuilderEx
+    {
+        public static IWebHostBuilder UseKestrel(this IWebHostBuilder hostBuilder, int port)
+        {
+            return hostBuilder.UseKestrel(options =>
+            {
+                options.Listen(new IPEndPoint(IPAddress.Any, port));
+            });
+        }
+    }
+
     public class Program
     {
         public static void Main(string[] args)
@@ -29,7 +42,8 @@ namespace demo_api
                     config.Bind("ConfigMap", configMap);
                     configBuilder.AddFeatureFlags(loggerFactory, configMap);
                 })
-                .UseStartup<Startup>();
+                .UseStartup<Startup>()
+                .UseKestrel(6010);
             return builder;
         }
 
