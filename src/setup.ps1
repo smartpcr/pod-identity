@@ -5,8 +5,8 @@ param(
     [string] $defaultResourceGroupName
 )
 
-$acrName = "oneesdevacr"
-$acr = az acr show -g $defaultResourceGroupName -n $acrName | ConvertFrom-Json
+$acrName = "sacedevacr"
+$acr = az acr show -n $acrName | ConvertFrom-Json
 $acrLoginServer = $acr.loginServer
 $imageName = "$($acrLoginServer)/$($serviceImageName)"
 $imagetag = "latest"

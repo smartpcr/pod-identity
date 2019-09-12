@@ -5,41 +5,43 @@ while (-not (Test-Path (Join-Path $gitRootFolder ".git"))) {
 }
 
 # assumes you are already logged in to azure
-$defaultResourceGroupName = "azds-rg"
-$aksClusterName = "xiaodong-azds-dev"
+$defaultResourceGroupName = "sace-dev-rg"
+$dataResourceGroupName = "sace-dev-data-rg"
+$aksClusterName = "sacedev"
 $location = "westus2"
-$vaultName = "xiaodong-kv"
+$vaultName = "sace-dev-kv"
 $azAccount = az account show | ConvertFrom-Json
 $mcResourceGroupName = "MC_$($defaultResourceGroupName)_$($aksClusterName)_$($location)"
 $serviceName = "demo"
 
-$acrName = "oneesdevacr"
-$acr = az acr show -g $defaultResourceGroupName -n $acrName | ConvertFrom-Json
+$acrName = "sacedevacr"
+$acr = az acr show -n $acrName | ConvertFrom-Json
 $acrPassword = "$(az acr credential show -n $acrName --query ""passwords[0].value"")"
 $acrOwnerEmail = "xiaodoli@microsoft.com"
 $acrLoginServer = $acr.loginServer
 $serviceImageName = "test/$($serviceName)"
 $serviceImageTag = "latest"
 $fullImageName = "$($acrLoginServer)/$($serviceImageName)"
-$aksSpnName = "App Center AKS AAD (non-production)"
-$aksSpn = az ad sp list --display-name $aksSpnName | ConvertFrom-Json
-$appSpnName = "onees-space-dev-xiaodong-wus2-spn"
-$appSpn = az ad sp list --display-name $appSpnName | ConvertFrom-Json
+$aksSpnAppId = "2e4c24df-5f5c-459d-9c01-beaf48af53e8"
+$aksSpn = az ad sp show --id $aksSpnAppId | ConvertFrom-Json
+# $appSpnName = "onees-space-dev-xiaodong-wus2-spn"
+# $appSpn = az ad sp list --display-name $appSpnName | ConvertFrom-Json
 
 Write-Host "0. Deploy aad-pod-identity infra.."
 kubectl apply -f https://raw.githubusercontent.com/Azure/aad-pod-identity/master/deploy/infra/deployment-rbac.yaml
 
 
-Write-Host "1. Creating managed service identity '$serviceName'..." -ForegroundColor White
-$msisFound = az identity list --resource-group $mcResourceGroupName --query "[?name=='$serviceName']" | ConvertFrom-Json
+$identityName = "sace-dev-kv-reader"
+Write-Host "1. Creating managed service identity '$identityName'..." -ForegroundColor White
+$msisFound = az identity list --resource-group $defaultResourceGroupName --query "[?name=='$identityName']" | ConvertFrom-Json
 if (!$msisFound -or ([array]$msisFound).Length -eq 0) {
-    Write-Host "Creating service identity '$serviceName'..."
-    az identity create --name $serviceName --resource-group $mcResourceGroupName | Out-Null
+    Write-Host "Creating service identity '$identityName'..."
+    az identity create --name $identityName --resource-group $defaultResourceGroupName | Out-Null
 }
 else {
-    Write-Host "Service identity '$serviceName' is already created."
+    Write-Host "Service identity '$identityName' is already created."
 }
-$serviceIdentity = az identity show --resource-group $mcResourceGroupName --name $serviceName | ConvertFrom-Json
+$serviceIdentity = az identity show --resource-group $defaultResourceGroupName --name $identityName | ConvertFrom-Json
 
 $settings = @{
     subscriptionId  = $azAccount.id
@@ -54,16 +56,17 @@ $settings = @{
     }
     serviceIdentity = @{
         clientId      = $serviceIdentity.clientId
+        objectId      = $serviceIdentity.principalId
         resourceGroup = $mcResourceGroupName
         id            = $serviceIdentity.id
     }
     aksSpn          = @{
         appId = $aksSpn.appId
     }
-    appSpn          = @{
-        appId    = $appSpn.appId
-        certFile = $appSpnCertFile
-    }
+    # appSpn          = @{
+    #     appId    = $appSpn.appId
+    #     certFile = $appSpnCertFile
+    # }
 }
 
 Write-Host "Granting read access to aks resource group '$($mcResourceGroupName)'..." -ForegroundColor Yellow
@@ -75,34 +78,36 @@ $rg = az group show --name $defaultResourceGroupName | ConvertFrom-Json
 az role assignment create --role Reader --assignee $serviceIdentity.principalId --scope $rg.id | Out-Null
 
 Write-Host "Granting read access to key vault '$vaultName'..." -ForegroundColor Yellow
-$kv = az keyvault show --resource-group $defaultResourceGroupName --name $vaultName | ConvertFrom-Json
+$kv = az keyvault show --name $vaultName | ConvertFrom-Json
 az role assignment create --role Reader --assignee $serviceIdentity.principalId --scope $kv.id | Out-Null
+
+Write-Host "Granting access policy for key vault '$vaultName'..." -ForegroundColor Yellow
 az keyvault set-policy -n $vaultName --secret-permissions get list --spn $serviceIdentity.clientId | Out-Null
 az keyvault set-policy -n $vaultName --certificate-permissions get list --spn $serviceIdentity.clientId | Out-Null
 
 Write-Host "Granting aks spn access to managed identity..."
 az role assignment create --role "Managed Identity Operator" --assignee $aksSpn.appId --scope $serviceIdentity.id | Out-Null
 
-Write-Host "2. Setup ACR connection as secret in AKS..."
-kubectl create secret docker-registry acr-auth `
-    --docker-server $acrLoginServer `
-    --docker-username $acrName `
-    --docker-password $acrPassword `
-    --docker-email $acrOwnerEmail
+# Write-Host "2. Setup ACR connection as secret in AKS..."
+# kubectl create secret docker-registry acr-auth `
+#     --docker-server $acrLoginServer `
+#     --docker-username $acrName `
+#     --docker-password $acrPassword `
+#     --docker-email $acrOwnerEmail
 
 
-Write-Host "3. Deploy ca cert"
-$sslCertSecret = az keyvault secret show --name "sslcert-dev-xiaodong-world" --vault-name "xiaodong-kv" | ConvertFrom-Json
-$secretYaml = $sslCertSecret.value | ConvertFrom-Yaml
-$caCrtFile = Join-Path $gitRootFolder "ca.crt"
-[System.IO.File]::WriteAllText($caCrtFile, $secretYaml.data["ca.crt"])
-$tlsCrtFile = Join-Path $gitRootFolder "tls.crt"
-[System.IO.File]::WriteAllText($tlsCrtFile, $secretYaml.data["tls.crt"])
-$tlsKeyFile = Join-Path $gitRootFolder "tls.key"
-[System.IO.File]::WriteAllText($tlsKeyFile, $secretYaml.data["tls.key"])
+# Write-Host "3. Deploy ca cert"
+# $sslCertSecret = az keyvault secret show --name "sslcert-dev-xiaodong-world" --vault-name "xiaodong-kv" | ConvertFrom-Json
+# $secretYaml = $sslCertSecret.value | ConvertFrom-Yaml
+# $caCrtFile = Join-Path $gitRootFolder "ca.crt"
+# [System.IO.File]::WriteAllText($caCrtFile, $secretYaml.data["ca.crt"])
+# $tlsCrtFile = Join-Path $gitRootFolder "tls.crt"
+# [System.IO.File]::WriteAllText($tlsCrtFile, $secretYaml.data["tls.crt"])
+# $tlsKeyFile = Join-Path $gitRootFolder "tls.key"
+# [System.IO.File]::WriteAllText($tlsKeyFile, $secretYaml.data["tls.key"])
 
-kubectl delete configmap ca-pemstore 
-kubectl create configmap ca-pemstore --from-file=ca.crt=$caCrtFile --from-file=tls.crt=$tlsCrtFile --from-file=tls.key=$tlsKeyFile
+# kubectl delete configmap ca-pemstore
+# kubectl create configmap ca-pemstore --from-file=ca.crt=$caCrtFile --from-file=tls.crt=$tlsCrtFile --from-file=tls.key=$tlsKeyFile
 
 
 Write-Host "3. Build docker image and push to acr..." -ForegroundColor White
