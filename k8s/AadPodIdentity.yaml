@@ -1,7 +1,7 @@
 apiVersion: "aadpodidentity.k8s.io/v1"
-kind: AzureIdentity 
+kind: AzureIdentity
 metadata:
-  name: demo
+  name: sace-dev-kv-reader
 spec:
   type: 0
   ResourceID: /subscriptions/f921dcc4-9d2c-4b73-a12e-8c3ca091af03/resourcegroups/sace-dev-rg/providers/Microsoft.ManagedIdentity/userAssignedIdentities/sace-dev-kv-reader

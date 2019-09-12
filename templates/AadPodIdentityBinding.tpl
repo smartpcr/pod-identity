@@ -4,4 +4,4 @@ metadata:
   name: "{{.Values.service.name}}-id-binding"
 spec:
   AzureIdentity: "{{.Values.identity.name}}"
-  Selector: "{{.Values.service.label}}"
+  Selector: "{{.Values.identity.name}}"

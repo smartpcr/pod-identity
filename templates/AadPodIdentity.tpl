@@ -1,7 +1,7 @@
 apiVersion: "aadpodidentity.k8s.io/v1"
-kind: AzureIdentity 
+kind: AzureIdentity
 metadata:
-  name: {{.Values.service.name}}
+  name: {{.Values.identity.name}}
 spec:
   type: 0
   ResourceID: {{.Values.serviceIdentity.id}}

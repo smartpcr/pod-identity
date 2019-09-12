@@ -4,4 +4,4 @@ metadata:
   name: "demo-id-binding"
 spec:
   AzureIdentity: "sace-dev-kv-reader"
-  Selector: "demo"
+  Selector: "sace-dev-kv-reader"
