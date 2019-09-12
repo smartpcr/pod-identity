@@ -1,0 +1,66 @@
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  labels:
+    app: "demo"
+    aadpodidbinding: "sace-dev-kv-reader"
+  name: demo
+  namespace: default
+spec:
+  template:
+    metadata:
+      labels:
+        app: demo
+        aadpodidbinding: sace-dev-kv-reader
+    spec:
+      containers:
+      - name: demo
+        image: "sacedevacr.azurecr.io/test/demo:latest"
+        imagePullPolicy: Always
+        resources:
+          requests:
+            memory: "200Mi"
+            cpu: "100m"
+          limits:
+            memory: "800Mi"
+            cpu: "200m"
+        securityContext:
+          capabilities:
+            drop:
+            - all
+        ports:
+          - containerPort: 6010
+            protocol: TCP
+        args:
+          - "--subscriptionid=f921dcc4-9d2c-4b73-a12e-8c3ca091af03"
+          - "--clientid=8388853b-4e49-4421-ad71-2b6684e66580"
+          - "--resourcegroup=MC_sace-dev-rg_sacedev_westus2"
+          - "--aad-resourcename=https://vault.azure.net"
+        env:
+          - name: MY_POD_NAME
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.name
+          - name: MY_POD_NAMESPACE
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.namespace
+          - name: MY_POD_IP
+            valueFrom:
+              fieldRef:
+                fieldPath: status.podIP
+
+      imagePullSecrets:
+        - name: acr-auth
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: "demo"
+  namespace: default
+spec:
+  type: LoadBalancer
+  ports:
+  - port: 80
+  selector:
+    app: "demo"

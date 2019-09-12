@@ -3,6 +3,14 @@ $gitRootFolder = if ($PSScriptRoot) { $PSScriptRoot } else { Get-Location }
 while (-not (Test-Path (Join-Path $gitRootFolder ".git"))) {
     $gitRootFolder = Split-Path $gitRootFolder -Parent
 }
+$moduleFolder = Join-Path $gitRootFolder "modules"
+Import-Module (Join-Path $moduleFolder "Logging.psm1") -Force
+Import-Module (Join-Path $moduleFolder "Common.psm1") -Force
+Import-Module (Join-Path $moduleFolder "YamlUtil.psm1") -Force
+$k8sFolder = Join-Path $gitRootFolder "k8s"
+if (-not (Test-Path $k8sFolder)) {
+    New-Item $k8sFolder -ItemType Directory -Force | Out-Null
+}
 
 # assumes you are already logged in to azure
 $defaultResourceGroupName = "sace-dev-rg"
@@ -21,14 +29,16 @@ $acrOwnerEmail = "xiaodoli@microsoft.com"
 $acrLoginServer = $acr.loginServer
 $serviceImageName = "test/$($serviceName)"
 $serviceImageTag = "latest"
-$fullImageName = "$($acrLoginServer)/$($serviceImageName)"
 $aksSpnAppId = "2e4c24df-5f5c-459d-9c01-beaf48af53e8"
 $aksSpn = az ad sp show --id $aksSpnAppId | ConvertFrom-Json
+
+$domainName = "sace.works"
+$sslCert = "sslcert-sace-works"
 # $appSpnName = "onees-space-dev-xiaodong-wus2-spn"
 # $appSpn = az ad sp list --display-name $appSpnName | ConvertFrom-Json
 
-Write-Host "0. Deploy aad-pod-identity infra.."
-kubectl apply -f https://raw.githubusercontent.com/Azure/aad-pod-identity/master/deploy/infra/deployment-rbac.yaml
+# Write-Host "0. Deploy aad-pod-identity infra.."
+# kubectl apply -f https://raw.githubusercontent.com/Azure/aad-pod-identity/master/deploy/infra/deployment-rbac.yaml
 
 
 $identityName = "sace-dev-kv-reader"
@@ -43,31 +53,6 @@ else {
 }
 $serviceIdentity = az identity show --resource-group $defaultResourceGroupName --name $identityName | ConvertFrom-Json
 
-$settings = @{
-    subscriptionId  = $azAccount.id
-    service         = @{
-        name      = $serviceName
-        label     = $serviceName
-        namespace = "default"
-        image     = @{
-            name = $fullImageName
-            tag  = $serviceImageTag
-        }
-    }
-    serviceIdentity = @{
-        clientId      = $serviceIdentity.clientId
-        objectId      = $serviceIdentity.principalId
-        resourceGroup = $mcResourceGroupName
-        id            = $serviceIdentity.id
-    }
-    aksSpn          = @{
-        appId = $aksSpn.appId
-    }
-    # appSpn          = @{
-    #     appId    = $appSpn.appId
-    #     certFile = $appSpnCertFile
-    # }
-}
 
 Write-Host "Granting read access to aks resource group '$($mcResourceGroupName)'..." -ForegroundColor Yellow
 $mcRG = az group show --name $mcResourceGroupName | ConvertFrom-Json
@@ -97,6 +82,7 @@ az role assignment create --role "Managed Identity Operator" --assignee $aksSpn.
 
 
 # Write-Host "3. Deploy ca cert"
+
 # $sslCertSecret = az keyvault secret show --name "sslcert-dev-xiaodong-world" --vault-name "xiaodong-kv" | ConvertFrom-Json
 # $secretYaml = $sslCertSecret.value | ConvertFrom-Yaml
 # $caCrtFile = Join-Path $gitRootFolder "ca.crt"
@@ -121,62 +107,95 @@ $serviceProjFolder = Join-Path $srcFolder "demo-api"
     -defaultResourceGroupName $defaultResourceGroupName
 
 Write-Host "4. Deploy service '$serviceName'..." -ForegroundColor White
+
+$settings = @{
+    global          = @{
+        envName        = "dev"
+        subscriptionId = $azAccount.id
+    }
+    acr             = @{
+        name = $acrName
+    }
+    dns             = @{
+        domain  = $domainName
+        sslCert = $sslCert
+    }
+    identity        = @{
+        name        = $identityName
+        id          = $serviceIdentity.id
+        clientId    = $serviceIdentity.clientId
+        principalId = $serviceIdentity.principalId
+    }
+    service         = @{
+        name      = $serviceName
+        label     = $serviceName
+        namespace = "default"
+        image     = @{
+            name = $serviceImageName
+            tag  = $serviceImageTag
+        }
+    }
+    serviceIdentity = @{
+        clientId      = $serviceIdentity.clientId
+        objectId      = $serviceIdentity.principalId
+        resourceGroup = $mcResourceGroupName
+        id            = $serviceIdentity.id
+    }
+    aksSpn          = @{
+        appId = $aksSpn.appId
+    }
+    # appSpn          = @{
+    #     appId    = $appSpn.appId
+    #     certFile = $appSpnCertFile
+    # }
+}
+
 $templatesFolder = Join-Path $gitRootFolder "templates"
 $deployTemplateFile = Join-Path $templatesFolder "deployment.tpl"
 $deploymentContent = Get-Content $deployTemplateFile -Raw
-$deploymentContent = $deploymentContent.Replace("{{.Values.subscriptionId}}", $settings.subscriptionId)
-$deploymentContent = $deploymentContent.Replace("{{.Values.service.namespace}}", $settings.service.namespace)
-$deploymentContent = $deploymentContent.Replace("{{.Values.service.name}}", $settings.service.name)
-$deploymentContent = $deploymentContent.Replace("{{.Values.service.label}}", $settings.service.label)
-$deploymentContent = $deploymentContent.Replace("{{.Values.service.image.name}}", $settings.service.image.name)
-$deploymentContent = $deploymentContent.Replace("{{.Values.service.image.tag}}", $settings.service.image.tag)
-$deploymentContent = $deploymentContent.Replace("{{.Values.serviceIdentity.clientId}}", $settings.serviceIdentity.clientId)
-$deploymentContent = $deploymentContent.Replace("{{.Values.serviceIdentity.resourceGroup}}", $settings.serviceIdentity.resourceGroup)
-$deploymentYamlFile = Join-Path $gitRootFolder "deployment.yaml"
+$deploymentContent = Set-YamlValues -ValueTemplate $deploymentContent -Settings $settings
+$deploymentYamlFile = Join-Path $k8sFolder "deployment.yaml"
 $deploymentContent | Out-File $deploymentYamlFile -Force -Encoding UTF8 | Out-Null
+
 kubectl apply -f $deploymentYamlFile
+
+
+Write-Host "8. Granting permission to read config map in its own namespace..."
+$configReaderTemplateFile = Join-Path $templatesFolder "ConfigReader.tpl"
+$configReaderContent = Get-Content $configReaderTemplateFile -Raw
+$configReaderContent = Set-YamlValues -ValueTemplate $configReaderContent -Settings $settings
+$configReaderYamlFile = Join-Path $k8sFolder "ConfigReaderRole.yaml"
+$configReaderContent | Out-File $configReaderYamlFile -Encoding UTF8 -Force | Out-Null
+kubectl apply -f $configReaderYamlFile
+
+$roleBindingTemplateFile = Join-Path $templatesFolder "ConfigReaderRoleBinding.tpl"
+$roleBindingContent = Get-Content $roleBindingTemplateFile -Raw
+$roleBindingContent = Set-YamlValues -ValueTemplate $roleBindingContent -Settings $settings
+$roleBindingYamlFile = Join-Path $k8sFolder "ConfigReaderRoleBinding.yaml"
+$roleBindingContent | Out-File $roleBindingYamlFile -Encoding UTF8 -Force | Out-Null
+kubectl apply -f $roleBindingYamlFile
 
 Write-Host "5. Deploy pod identity..." -ForegroundColor White
 $podIdentityTempFile = Join-Path $templatesFolder "AadPodIdentity.tpl"
 $podIdentityContent = Get-Content $podIdentityTempFile -Raw
-$podIdentityContent = $podIdentityContent.Replace("{{.Values.service.name}}", $settings.service.name)
-$podIdentityContent = $podIdentityContent.Replace("{{.Values.serviceIdentity.id}}", $settings.serviceIdentity.id)
-$podIdentityContent = $podIdentityContent.Replace("{{.Values.serviceIdentity.clientId}}", $settings.serviceIdentity.clientId)
-$podIdentityYamlFile = Join-Path $gitRootFolder "AadPodIdentity.yaml"
+$podIdentityContent = Set-YamlValues -ValueTemplate $podIdentityContent -Settings $settings
+$podIdentityYamlFile = Join-Path $k8sFolder "AadPodIdentity.yaml"
 $podIdentityContent | Out-File $podIdentityYamlFile -Encoding UTF8 -Force | Out-Null
 kubectl apply -f $podIdentityYamlFile
 
 Write-Host "6. Deploy pod identity binding..." -ForegroundColor White
 $identityBindingTemplateFile = Join-Path $templatesFolder "AadPodIdentityBinding.tpl"
 $identityBindingContent = Get-Content $identityBindingTemplateFile -Raw
-$identityBindingContent = $identityBindingContent.Replace("{{.Values.service.name}}", $settings.service.name)
-$identityBindingContent = $identityBindingContent.Replace("{{.Values.service.label}}", $settings.service.label)
-$identityBindingYamlFile = Join-Path $gitRootFolder "AadPodIdentityBinding.yaml"
+$identityBindingContent = Set-YamlValues -ValueTemplate $identityBindingContent -Settings $settings
+$identityBindingYamlFile = Join-Path $k8sFolder "AadPodIdentityBinding.yaml"
 $identityBindingContent | Out-File $identityBindingYamlFile -Encoding UTF8 -Force | Out-Null
 kubectl apply -f $identityBindingYamlFile
 
-Write-Host "7. Deploy service and expose api endpoint..."
-$serviceTemplateFile = Join-Path $templatesFolder "Service.tpl"
-$serviceContent = Get-Content $serviceTemplateFile -Raw
-$serviceContent = $serviceContent.Replace("{{.Values.service.name}}", $settings.service.name)
-$serviceContent = $serviceContent.Replace("{{.Values.service.label}}", $settings.service.label)
-$serviceYamlFile = Join-Path $gitRootFolder "Service.yaml"
-$serviceContent | Out-File $serviceYamlFile -Encoding UTF8 -Force | Out-Null
-kubectl apply -f $serviceYamlFile
-
-Write-Host "8. Granting permission to read config map in its own namespace..."
-$configReaderTemplateFile = Join-Path $templatesFolder "ConfigReader.tpl"
-$configReaderContent = Get-Content $configReaderTemplateFile -Raw
-$configReaderContent = $configReaderContent.Replace("{{.Values.service.name}}", $settings.service.name)
-$configReaderContent = $configReaderContent.Replace("{{.Values.service.namespace}}", $settings.service.namespace)
-$configReaderYamlFile = Join-Path $gitRootFolder "ConfigReaderRole.yaml"
-$configReaderContent | Out-File $configReaderYamlFile -Encoding UTF8 -Force | Out-Null
-kubectl apply -f $configReaderYamlFile
-
-$roleBindingTemplateFile = Join-Path $templatesFolder "ConfigReaderRoleBinding.tpl"
-$roleBindingContent = Get-Content $roleBindingTemplateFile -Raw
-$roleBindingContent = $roleBindingContent.Replace("{{.Values.service.name}}", $settings.service.name)
-$roleBindingContent = $roleBindingContent.Replace("{{.Values.service.namespace}}", $settings.service.namespace)
-$roleBindingYamlFile = Join-Path $gitRootFolder "ConfigReaderRoleBinding.yaml"
-$roleBindingContent | Out-File $roleBindingYamlFile -Encoding UTF8 -Force | Out-Null
-kubectl apply -f $roleBindingYamlFile
+# Write-Host "7. Deploy service and expose api endpoint..."
+# $serviceTemplateFile = Join-Path $templatesFolder "Service.tpl"
+# $serviceContent = Get-Content $serviceTemplateFile -Raw
+# $serviceContent = $serviceContent.Replace("{{.Values.service.name}}", $settings.service.name)
+# $serviceContent = $serviceContent.Replace("{{.Values.service.label}}", $settings.service.label)
+# $serviceYamlFile = Join-Path $k8sFolder "Service.yaml"
+# $serviceContent | Out-File $serviceYamlFile -Encoding UTF8 -Force | Out-Null
+# kubectl apply -f $serviceYamlFile
